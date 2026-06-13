@@ -25,7 +25,7 @@ interface Action {
 const ACTIONS: Action[] = [
   {
     id: "grammar",
-    label: "Fix Grammar",
+    label: "Improve",
     icon: "✍️",
     iconClass: "icon-grammar",
     shortcut: "⌘⇧G",
@@ -37,23 +37,25 @@ const ACTIONS: Action[] = [
     iconClass: "icon-rewrite",
     shortcut: "⌘⇧R",
   },
+  /*
   {
     id: "jira",
     label: "Jira Style",
     icon: "📋",
     iconClass: "icon-jira",
     shortcut: "⌘⇧J",
-  },
+  }*/
+  ,
   {
     id: "standup",
-    label: "Standup",
+    label: "Standup Notes",
     icon: "📅",
     iconClass: "icon-standup",
     shortcut: "⌘⇧S",
   },
   {
     id: "bugreport",
-    label: "Bug Report",
+    label: "Jira Ticket",
     icon: "🐛",
     iconClass: "icon-bug",
     shortcut: "⌘⇧B",
@@ -93,6 +95,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [ollamaOnline, setOllamaOnline] = useState(false);
   const abortRef = useRef<boolean>(false);
+  const [userText, setUserText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isPinned, setIsPinned] = useState(() => {
@@ -151,12 +155,13 @@ export default function App() {
   }, []);
 
   const runAction = useCallback(async (action: ActionType, text?: string) => {
-    const clipboardText = text ?? (await readClipboard());
-    if (!clipboardText.trim()) {
+    // Priority: explicit text arg > userText from textarea > clipboard
+    const resolvedText = text ?? (userText.trim() ? userText : await readClipboard());
+    if (!resolvedText.trim()) {
       setActiveAction(action);
       setInputText("");
       setStreamingText("");
-      setError("Clipboard is empty. Copy some text first, then try again.");
+      setError("No text provided. Type text above or copy some text first, then try again.");
       setIsDone(true);
       setScreen("result");
       setIsCollapsed(false);
@@ -165,14 +170,14 @@ export default function App() {
 
     abortRef.current = false;
     setActiveAction(action);
-    setInputText(clipboardText);
+    setInputText(resolvedText);
     setStreamingText("");
     setError(null);
     setIsDone(false);
     setScreen("result");
     setIsCollapsed(false); // Expand to show streaming progress
 
-    const prompt = buildPrompt(action, clipboardText);
+    const prompt = buildPrompt(action, resolvedText);
 
     await generateText(
       prompt,
@@ -190,7 +195,7 @@ export default function App() {
         }
       }
     );
-  }, []);
+  }, [userText]);
 
   const handleShortcut = useCallback(
     (action: ActionType) => {
@@ -259,9 +264,33 @@ export default function App() {
 
         {/* Main menu content */}
         <div className="app-content">
+          {/* Text Input Area */}
+          <div className="text-input-container">
+            <textarea
+              ref={textareaRef}
+              className="text-input-area"
+              placeholder="Type or paste your text here…"
+              value={userText}
+              onChange={(e) => setUserText(e.target.value)}
+              rows={3}
+            />
+            {userText && (
+              <button
+                className="text-input-clear"
+                onClick={() => {
+                  setUserText("");
+                  textareaRef.current?.focus();
+                }}
+                title="Clear text"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div className="clipboard-hint">
             <span>📋</span>
-            <span>Copy text, then click an action or use a shortcut</span>
+            <span>{userText.trim() ? "Text ready — pick an action below" : "Type above, or copy text and use a shortcut"}</span>
           </div>
 
           <div className="section-label">Actions</div>
@@ -297,25 +326,25 @@ export default function App() {
             <span className="action-label">Settings</span>
           </button>
         </div>
-
-        {/* Result overlay */}
-        {screen === "result" && activeAction && (
-          <ResultPanel
-            action={activeAction}
-            inputText={inputText}
-            streamingText={streamingText}
-            isDone={isDone}
-            error={error}
-            onBack={handleBack}
-            onRetry={handleRetry}
-          />
-        )}
-
-        {/* Settings overlay */}
-        {screen === "settings" && (
-          <SettingsScreen onClose={() => setScreen("menu")} />
-        )}
       </div>
+
+      {/* Result overlay — outside shell-main-content to avoid pointer-events: none when collapsed */}
+      {screen === "result" && activeAction && (
+        <ResultPanel
+          action={activeAction}
+          inputText={inputText}
+          streamingText={streamingText}
+          isDone={isDone}
+          error={error}
+          onBack={handleBack}
+          onRetry={handleRetry}
+        />
+      )}
+
+      {/* Settings overlay — outside shell-main-content */}
+      {screen === "settings" && (
+        <SettingsScreen onClose={() => setScreen("menu")} />
+      )}
     </div>
   );
 }
