@@ -10,7 +10,14 @@ import { jiraPrompt } from "./prompts/jira";
 import { standupPrompt } from "./prompts/standup";
 import { bugReportPrompt } from "./prompts/bugreport";
 import { testCasePrompt } from "./prompts/testcase";
+import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import appIcon from "./assets/icon-32.png";
 import "./index.css";
+
+const EXPANDED_WIDTH = 300;
+const EXPANDED_HEIGHT = 320;
+const COLLAPSED_WIDTH = 48;
+const COLLAPSED_HEIGHT = 60;
 
 type Screen = "menu" | "result" | "settings";
 
@@ -36,15 +43,7 @@ const ACTIONS: Action[] = [
     icon: "🔄",
     iconClass: "icon-rewrite",
     shortcut: "⌘⇧R",
-  },
-  /*
-  {
-    id: "jira",
-    label: "Jira Style",
-    icon: "📋",
-    iconClass: "icon-jira",
-    shortcut: "⌘⇧J",
-  }*/
+  }
   ,
   {
     id: "standup",
@@ -104,11 +103,42 @@ export default function App() {
     return saved ? JSON.parse(saved) : false;
   });
   const collapseTimeoutRef = useRef<any>(null);
+  const isResizingRef = useRef(false);
+  const windowPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // sync pin preference to localStorage
   useEffect(() => {
     localStorage.setItem("LocalMate_pinned", JSON.stringify(isPinned));
   }, [isPinned]);
+
+  // Resize the actual Tauri window when collapse state changes
+  useEffect(() => {
+    const tauriWindow = getCurrentWindow();
+    const resizeWindow = async () => {
+      if (isResizingRef.current) return;
+      isResizingRef.current = true;
+      try {
+        if (isCollapsed && !isPinned) {
+          // Save current position before collapsing
+          const pos = await tauriWindow.outerPosition();
+          windowPosRef.current = { x: pos.x, y: pos.y };
+          // Move window right so the collapsed handle stays at the right edge
+          const newX = pos.x + (EXPANDED_WIDTH - COLLAPSED_WIDTH);
+          await tauriWindow.setSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
+          await tauriWindow.setPosition(new LogicalPosition(newX, pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2));
+        } else {
+          // Restore expanded size
+          if (windowPosRef.current) {
+            await tauriWindow.setPosition(new LogicalPosition(windowPosRef.current.x, windowPosRef.current.y));
+          }
+          await tauriWindow.setSize(new LogicalSize(EXPANDED_WIDTH, EXPANDED_HEIGHT));
+        }
+      } finally {
+        isResizingRef.current = false;
+      }
+    };
+    resizeWindow();
+  }, [isCollapsed, isPinned]);
 
   const expandPanel = useCallback(() => {
     if (collapseTimeoutRef.current) {
@@ -233,16 +263,16 @@ export default function App() {
         onClick={expandPanel}
         onMouseEnter={expandPanel}
       >
-        <span className="floating-handle-icon">✨</span>
+        <img src={appIcon} alt="LocalMate" className="floating-handle-icon" />
       </div>
 
       <div className="shell-main-content">
         {/* Header — always visible as base layer */}
         <div className="app-header" data-tauri-drag-region>
-          <div className="header-icon">✨</div>
+          <div className="header-icon"><img src={appIcon} alt="LocalMate" className="header-icon-img" /></div>
           <div className="header-info">
             <div className="header-title">LocalMate</div>
-            <div className="header-subtitle">Local Writing Assistant</div>
+            <div className="header-subtitle">Your LLM Assistant</div>
           </div>
 
           <button
@@ -254,6 +284,17 @@ export default function App() {
             title={isPinned ? "Unpin panel (enable auto-hide)" : "Pin panel (disable auto-hide)"}
           >
             📌
+          </button>
+
+          <button
+            className="header-minimize-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(true);
+            }}
+            title="Minimize to handle"
+          >
+            ⎯
           </button>
 
           <div
@@ -324,6 +365,17 @@ export default function App() {
               ⚙️
             </div>
             <span className="action-label">Settings</span>
+          </button>
+
+          <button
+            id="btn-quit"
+            className="action-btn quit-btn"
+            onClick={() => getCurrentWindow().destroy()}
+          >
+            <div className="action-icon icon-quit">
+              ⏻
+            </div>
+            <span className="action-label">Quit App</span>
           </button>
         </div>
       </div>
