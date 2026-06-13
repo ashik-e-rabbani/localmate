@@ -7,10 +7,10 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [model, setModel] = useState(
-    localStorage.getItem("LocalMate_model") || "qwen3:8b"
+    localStorage.getItem("LocalMate_model") || import.meta.env.VITE_DEFAULT_MODEL || "llama3.2"
   );
   const [temperature, setTemperature] = useState(
-    localStorage.getItem("LocalMate_temperature") || "0.3"
+    localStorage.getItem("LocalMate_temperature") || import.meta.env.VITE_DEFAULT_TEMPERATURE || "0.3"
   );
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -46,7 +46,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             type="text"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder="e.g. qwen3:8b"
+            placeholder="e.g. llama3.2"
           />
           {models.length > 0 && (
             <select

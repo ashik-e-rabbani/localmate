@@ -9,7 +9,9 @@ export interface OllamaChunk {
   done: boolean;
 }
 
-const OLLAMA_BASE_URL = "http://localhost:11434";
+const OLLAMA_BASE_URL = import.meta.env.VITE_OLLAMA_BASE_URL || "http://localhost:11434";
+const DEFAULT_MODEL = import.meta.env.VITE_DEFAULT_MODEL || "llama3.2";
+const DEFAULT_TEMPERATURE = import.meta.env.VITE_DEFAULT_TEMPERATURE || "0.3";
 
 export async function generateText(
   prompt: string,
@@ -19,7 +21,7 @@ export async function generateText(
   model?: string
 ): Promise<void> {
   const selectedModel =
-    model || localStorage.getItem("LocalMate_model") || "qwen3:8b";
+    model || localStorage.getItem("LocalMate_model") || DEFAULT_MODEL;
 
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
@@ -31,7 +33,7 @@ export async function generateText(
         stream: true,
         options: {
           temperature: parseFloat(
-            localStorage.getItem("LocalMate_temperature") || "0.3"
+            localStorage.getItem("LocalMate_temperature") || DEFAULT_TEMPERATURE
           ),
         },
       }),
