@@ -1,8 +1,8 @@
 [package]
 name = "localmate"
 version = "0.1.0"
-description = "LocalMate - Local Writing Assistant"
-authors = ["LocalMate"]
+description = "LocalMate - Your LLM Assistant"
+authors = ["Ashik Rabbani"]
 edition = "2021"
 
 [lib]
