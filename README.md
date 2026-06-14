@@ -1,8 +1,15 @@
 # LocalMate
+<img width="64" height="64" alt="localmate" src="https://github.com/user-attachments/assets/4785f812-12b9-428a-950e-4570963be607" />
 
-LocalMate is a personal desktop application that talks directly with your locally installed LLMs. It empowers you with features like text rewriting, grammar fixes, and seamless Jira updates—all while keeping your data private and entirely on your local machine.
+LocalMate is a personal desktop application that talks directly with your locally installed LLMs. It empowers you with features like text rewriting, grammar fixes, and seamless Jira updates, all while keeping your data private and entirely on your local machine.
 
 Built with **React**, **Vite**, and **Tauri**.
+
+<img width="300" height="200" alt="localmateScreen002" src="https://github.com/user-attachments/assets/162f7f40-aec6-466c-a936-b8b7f878a149" />
+<img width="300" height="200" alt="localmateScrenn001" src="https://github.com/user-attachments/assets/a0961c36-baf2-416b-bd28-b588259dd7ef" />
+<img width="300" height="200" alt="localmate004" src="https://github.com/user-attachments/assets/f902c1e6-ae86-4696-b5cf-7206e0080eb8" />
+
+<!-- <img width="200" height="300" alt="localmate003" src="https://github.com/user-attachments/assets/f271d64c-9524-4f76-8ce8-3f751386ac7d" /> -->
 
 ## 📦 Installing Packages
 
@@ -60,4 +67,4 @@ Contributions are alaways Welcome!
 
 ---
 
-Built with ❤️ by [Ashiq Rabbani](https://github.com/ashik-e-rabbani)
+Built with ❤️ by [Ashik Rabbani](https://github.com/ashik-e-rabbani)
