@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LocalMate",
-  "version": "0.1.0",
-  "identifier": "com.ashik.ai",
+  "version": "0.1.1",
+  "identifier": "com.ashikrabbani.localmate",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -15,12 +15,14 @@
       {
         "label": "main",
         "title": "LocalMate",
-        "width": 240,
+        "width": 300,
         "height": 500,
+        "minWidth": 32,
+        "minHeight": 32,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
-        "resizable": false,
+        "resizable": true,
         "shadow": false,
         "skipTaskbar": true,
         "visible": true

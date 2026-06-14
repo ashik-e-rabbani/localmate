@@ -92,8 +92,8 @@ html, body, #root {
 
 /* App Shell */
 .app-shell {
-  width: 240px;
-  height: 500px;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -107,17 +107,17 @@ html, body, #root {
   -webkit-backdrop-filter: blur(24px);
   pointer-events: auto;
   user-select: none;
-  transition: transform var(--transition-bounce), border-radius var(--transition-smooth), box-shadow var(--transition-smooth);
+  transition: border-radius var(--transition-smooth), box-shadow var(--transition-smooth);
 }
 
 .app-shell.collapsed {
-  transform: translateX(216px); /* Slide off-screen, leaving 24px handle visible */
-  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  border-radius: var(--radius-xl);
   background: transparent;
   border-color: transparent;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  pointer-events: none;
 }
 
 .shell-main-content {
@@ -139,28 +139,30 @@ html, body, #root {
 .floating-handle {
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 24px;
-  height: 36px; /* Shorter, compact tab */
+  top: 0;
+  width: 32px;
+  height: 32px;
   background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
   border: 1px solid var(--border-subtle);
-  border-right: none;
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: grab;
   z-index: 9999;
-  transition: opacity var(--transition-smooth), transform var(--transition-smooth), background var(--transition-fast), width var(--transition-fast);
+  transition: opacity var(--transition-smooth), transform var(--transition-smooth), background var(--transition-fast);
   pointer-events: auto;
-  box-shadow: -2px 0 12px rgba(124, 92, 252, 0.2);
+  box-shadow: 0 0 12px rgba(124, 92, 252, 0.2);
+}
+
+.floating-handle:active {
+  cursor: grabbing;
 }
 
 .floating-handle:hover {
   background: var(--bg-hover);
   border-color: var(--accent-secondary);
-  width: 28px; /* Expand slightly outward on hover */
+  transform: scale(1.05);
 }
 
 .floating-handle-icon {
@@ -168,13 +170,14 @@ html, body, #root {
   height: 18px;
   border-radius: 4px;
   object-fit: cover;
+  pointer-events: none;
 }
 
 /* Hide handle when expanded */
 .app-shell:not(.collapsed) .floating-handle {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%) scale(0.8) translateX(-10px);
+  transform: scale(0.8);
 }
 
 /* Header */
