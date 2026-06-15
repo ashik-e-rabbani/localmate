@@ -15,9 +15,9 @@ import appIcon from "./assets/icon-32.png";
 import "./index.css";
 
 const EXPANDED_WIDTH = 300;
-const EXPANDED_HEIGHT = 320;
-const COLLAPSED_WIDTH = 48;
-const COLLAPSED_HEIGHT = 60;
+const EXPANDED_HEIGHT = 500;
+const COLLAPSED_WIDTH = 32;
+const COLLAPSED_HEIGHT = 32;
 
 type Screen = "menu" | "result" | "settings";
 
@@ -105,6 +105,7 @@ export default function App() {
   const collapseTimeoutRef = useRef<any>(null);
   const isResizingRef = useRef(false);
   const windowPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [resizeError, setResizeError] = useState<string | null>(null);
 
   // sync pin preference to localStorage
   useEffect(() => {
@@ -118,12 +119,19 @@ export default function App() {
       if (isResizingRef.current) return;
       isResizingRef.current = true;
       try {
-        if (isCollapsed && !isPinned) {
-          // Save current position before collapsing
-          const pos = await tauriWindow.outerPosition();
+        const factor = await tauriWindow.scaleFactor();
+        if (isCollapsed) {
+          // Save current logical position before collapsing
+          const physicalPos = await tauriWindow.outerPosition();
+          // @ts-ignore
+          const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
           windowPosRef.current = { x: pos.x, y: pos.y };
           // Move window right so the collapsed handle stays at the right edge
           const newX = pos.x + (EXPANDED_WIDTH - COLLAPSED_WIDTH);
+          // Force window to be resizable so macOS doesn't ignore the setSize command
+          await tauriWindow.setResizable(true);
+          await tauriWindow.setMinSize(new LogicalSize(32, 32));
+          
           await tauriWindow.setSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
           await tauriWindow.setPosition(new LogicalPosition(newX, pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2));
         } else {
@@ -131,8 +139,13 @@ export default function App() {
           if (windowPosRef.current) {
             await tauriWindow.setPosition(new LogicalPosition(windowPosRef.current.x, windowPosRef.current.y));
           }
+          await tauriWindow.setResizable(true);
           await tauriWindow.setSize(new LogicalSize(EXPANDED_WIDTH, EXPANDED_HEIGHT));
         }
+        setResizeError(null);
+      } catch (err: any) {
+        setResizeError(err.toString());
+        console.error("Failed to resize window:", err);
       } finally {
         isResizingRef.current = false;
       }
@@ -261,9 +274,10 @@ export default function App() {
       <div
         className="floating-handle"
         onClick={expandPanel}
-        onMouseEnter={expandPanel}
+        data-tauri-drag-region
       >
         <img src={appIcon} alt="LocalMate" className="floating-handle-icon" />
+        {resizeError && <div style={{position:'absolute', top: '100%', left: 0, background:'red', color:'white', fontSize:'10px', width: '200px', zIndex: 9999}}>{resizeError}</div>}
       </div>
 
       <div className="shell-main-content">
