@@ -41,6 +41,15 @@ LocalMate requires environment variables to configure its connection to your loc
 
 ## 🚀 Running
 
+To run with the **Release** builds:
+
+- Run ollama server @ http://localhost:11434
+- Install the localmate application
+- Specify the model in application **Settings** -> **Save**
+You will see a green dot indicating a successful connection with your local server.
+
+---
+
 To start LocalMate in development mode (this will spin up the Vite dev server and launch the native Tauri application window):
 
 ```bash
