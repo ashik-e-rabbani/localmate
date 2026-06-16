@@ -21,11 +21,11 @@ interface ResultPanelProps {
 }
 
 const ACTION_LABELS: Record<ActionType, string> = {
-  grammar: "Fix Grammar",
+  grammar: "Improve Writing",
   rewrite: "Rewrite",
   jira: "Jira Style",
   standup: "Standup",
-  bugreport: "Bug Report",
+  bugreport: "Jira Ticket",
   testcase: "Test Case",
 };
 
