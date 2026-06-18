@@ -106,6 +106,7 @@ export default function App() {
   const isResizingRef = useRef(false);
   const windowPosRef = useRef<{ x: number; y: number } | null>(null);
   const [resizeError, setResizeError] = useState<string | null>(null);
+  const handleMouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
   // sync pin preference to localStorage
   useEffect(() => {
@@ -135,12 +136,16 @@ export default function App() {
           await tauriWindow.setSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
           await tauriWindow.setPosition(new LogicalPosition(newX, pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2));
         } else {
-          // Restore expanded size
-          if (windowPosRef.current) {
-            await tauriWindow.setPosition(new LogicalPosition(windowPosRef.current.x, windowPosRef.current.y));
-          }
+          // Read the handle's current position (user may have dragged it)
+          const physicalPos = await tauriWindow.outerPosition();
+          // @ts-ignore
+          const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
+          // Reverse the collapse offset so the handle stays visually in the same spot
+          const expandedX = pos.x - (EXPANDED_WIDTH - COLLAPSED_WIDTH);
+          const expandedY = pos.y - (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2;
           await tauriWindow.setResizable(true);
           await tauriWindow.setSize(new LogicalSize(EXPANDED_WIDTH, EXPANDED_HEIGHT));
+          await tauriWindow.setPosition(new LogicalPosition(expandedX, expandedY));
         }
         setResizeError(null);
       } catch (err: any) {
@@ -273,7 +278,12 @@ export default function App() {
       {/* Floating Handle — visible only when collapsed */}
       <div
         className="floating-handle"
-        onClick={expandPanel}
+        onMouseDown={(e) => { handleMouseDownPos.current = { x: e.screenX, y: e.screenY }; }}
+        onClick={(e) => {
+          const down = handleMouseDownPos.current;
+          if (down && (Math.abs(e.screenX - down.x) > 4 || Math.abs(e.screenY - down.y) > 4)) return;
+          expandPanel();
+        }}
         data-tauri-drag-region
       >
         <img src={appIcon} alt="LocalMate" className="floating-handle-icon" />
