@@ -16,8 +16,49 @@ import "./index.css";
 
 const EXPANDED_WIDTH = 300;
 const EXPANDED_HEIGHT = 500;
-const COLLAPSED_WIDTH = 32;
-const COLLAPSED_HEIGHT = 32;
+const COLLAPSED_WIDTH = 40;
+const COLLAPSED_HEIGHT = 40;
+
+const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+type WinRect = { w: number; h: number; x: number; y: number };
+
+const nextFrame = () => new Promise<void>(r => requestAnimationFrame(() => r()));
+
+async function animateWindow(
+  win: ReturnType<typeof getCurrentWindow>,
+  from: WinRect,
+  to: WinRect,
+  duration: number,
+  ease: (t: number) => number,
+  genRef: { current: number },
+  gen: number
+): Promise<void> {
+  const startTime = performance.now();
+
+  while (true) {
+    if (genRef.current !== gen) return;
+
+    const progress = Math.min((performance.now() - startTime) / duration, 1);
+    const t = ease(progress);
+
+    await Promise.all([
+      win.setSize(new LogicalSize(
+        Math.round(from.w + (to.w - from.w) * t),
+        Math.round(from.h + (to.h - from.h) * t)
+      )),
+      win.setPosition(new LogicalPosition(
+        from.x + (to.x - from.x) * t,
+        from.y + (to.y - from.y) * t
+      )),
+    ]);
+
+    if (progress >= 1) break;
+    await nextFrame(); // wait for display refresh before next step
+  }
+}
 
 type Screen = "menu" | "result" | "settings";
 
@@ -103,10 +144,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : false;
   });
   const collapseTimeoutRef = useRef<any>(null);
-  const isResizingRef = useRef(false);
-  const windowPosRef = useRef<{ x: number; y: number } | null>(null);
-  const [resizeError, setResizeError] = useState<string | null>(null);
+const [resizeError, setResizeError] = useState<string | null>(null);
   const handleMouseDownPos = useRef<{ x: number; y: number } | null>(null);
+  const animGenRef = useRef(0);
 
   // sync pin preference to localStorage
   useEffect(() => {
@@ -116,46 +156,46 @@ export default function App() {
   // Resize the actual Tauri window when collapse state changes
   useEffect(() => {
     const tauriWindow = getCurrentWindow();
-    const resizeWindow = async () => {
-      if (isResizingRef.current) return;
-      isResizingRef.current = true;
+    const gen = ++animGenRef.current;
+
+    const run = async () => {
       try {
         const factor = await tauriWindow.scaleFactor();
+        if (gen !== animGenRef.current) return;
+
+        const physicalPos = await tauriWindow.outerPosition();
+        // @ts-ignore
+        const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
+
+        await tauriWindow.setResizable(true);
+        await tauriWindow.setMinSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
+
         if (isCollapsed) {
-          // Save current logical position before collapsing
-          const physicalPos = await tauriWindow.outerPosition();
-          // @ts-ignore
-          const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
-          windowPosRef.current = { x: pos.x, y: pos.y };
-          // Move window right so the collapsed handle stays at the right edge
-          const newX = pos.x + (EXPANDED_WIDTH - COLLAPSED_WIDTH);
-          // Force window to be resizable so macOS doesn't ignore the setSize command
-          await tauriWindow.setResizable(true);
-          await tauriWindow.setMinSize(new LogicalSize(32, 32));
-          
-          await tauriWindow.setSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
-          await tauriWindow.setPosition(new LogicalPosition(newX, pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2));
+          const from: WinRect = { w: EXPANDED_WIDTH, h: EXPANDED_HEIGHT, x: pos.x, y: pos.y };
+          const to: WinRect = {
+            w: COLLAPSED_WIDTH,
+            h: COLLAPSED_HEIGHT,
+            x: pos.x + (EXPANDED_WIDTH - COLLAPSED_WIDTH),
+            y: pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2,
+          };
+          await animateWindow(tauriWindow, from, to, 200, easeInOutCubic, animGenRef, gen);
         } else {
-          // Read the handle's current position (user may have dragged it)
-          const physicalPos = await tauriWindow.outerPosition();
-          // @ts-ignore
-          const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
-          // Reverse the collapse offset so the handle stays visually in the same spot
-          const expandedX = pos.x - (EXPANDED_WIDTH - COLLAPSED_WIDTH);
-          const expandedY = pos.y - (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2;
-          await tauriWindow.setResizable(true);
-          await tauriWindow.setSize(new LogicalSize(EXPANDED_WIDTH, EXPANDED_HEIGHT));
-          await tauriWindow.setPosition(new LogicalPosition(expandedX, expandedY));
+          const from: WinRect = { w: COLLAPSED_WIDTH, h: COLLAPSED_HEIGHT, x: pos.x, y: pos.y };
+          const to: WinRect = {
+            w: EXPANDED_WIDTH,
+            h: EXPANDED_HEIGHT,
+            x: pos.x - (EXPANDED_WIDTH - COLLAPSED_WIDTH),
+            y: pos.y - (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2,
+          };
+          await animateWindow(tauriWindow, from, to, 200, easeOutCubic, animGenRef, gen);
         }
         setResizeError(null);
       } catch (err: any) {
         setResizeError(err.toString());
         console.error("Failed to resize window:", err);
-      } finally {
-        isResizingRef.current = false;
       }
     };
-    resizeWindow();
+    run();
   }, [isCollapsed, isPinned]);
 
   const expandPanel = useCallback(() => {
