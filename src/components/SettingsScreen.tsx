@@ -6,25 +6,33 @@ interface SettingsScreenProps {
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
+  const [serverUrl, setServerUrl] = useState(
+    localStorage.getItem("LocalMate_serverUrl") || import.meta.env.VITE_OLLAMA_BASE_URL || "http://localhost:11434"
+  );
   const [model, setModel] = useState(
     localStorage.getItem("LocalMate_model") || import.meta.env.VITE_DEFAULT_MODEL || "llama3.2"
   );
   const [temperature, setTemperature] = useState(
     localStorage.getItem("LocalMate_temperature") || import.meta.env.VITE_DEFAULT_TEMPERATURE || "0.3"
   );
+  const [toolsEnabled, setToolsEnabled] = useState(
+    localStorage.getItem("LocalMate_toolsEnabled") !== "false"
+  );
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
   const handleLoadModels = async () => {
     setLoadingModels(true);
-    const list = await listModels();
+    const list = await listModels(serverUrl);
     setModels(list);
     setLoadingModels(false);
   };
 
   const handleSave = () => {
+    localStorage.setItem("LocalMate_serverUrl", serverUrl);
     localStorage.setItem("LocalMate_model", model);
     localStorage.setItem("LocalMate_temperature", temperature);
+    localStorage.setItem("LocalMate_toolsEnabled", String(toolsEnabled));
     onClose();
   };
 
@@ -39,6 +47,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
       </div>
 
       <div className="settings-body">
+        <div className="settings-group">
+          <label className="settings-label">Server URL</label>
+          <input
+            className="settings-input"
+            type="url"
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
+            placeholder="http://localhost:11434"
+          />
+        </div>
+
         <div className="settings-group">
           <label className="settings-label">Ollama Model</label>
           <input
@@ -94,6 +113,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           >
             <span>Precise (0)</span>
             <span>Creative (1)</span>
+          </div>
+        </div>
+
+        <div className="settings-group">
+          <label className="settings-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>Tool Use</span>
+            <input
+              type="checkbox"
+              checked={toolsEnabled}
+              onChange={(e) => setToolsEnabled(e.target.checked)}
+              style={{ width: "auto", accentColor: "var(--accent-primary)", cursor: "pointer" }}
+            />
+          </label>
+          <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "2px" }}>
+            Enables date & web-fetch tools. Requires a model that supports tool calling (llama3.1, llama3.2, qwen2.5, mistral-nemo).
           </div>
         </div>
 
