@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { listModels } from "../services/ollama";
+import { getAppMeta } from "../constants/app";
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -20,6 +21,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   );
   const [models, setModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [appMeta, setAppMeta] = useState<{ name: string; version: string; author: string } | null>(null);
+  const [versionTaps, setVersionTaps] = useState(0);
+  const [showAuthor, setShowAuthor] = useState(false);
+
+  useEffect(() => {
+    getAppMeta().then(setAppMeta);
+  }, []);
+
+  const handleVersionClick = () => {
+    const next = versionTaps + 1;
+    setVersionTaps(next);
+    if (next >= 3) {
+      setShowAuthor(true);
+      setVersionTaps(0);
+    }
+  };
 
   const handleLoadModels = async () => {
     setLoadingModels(true);
@@ -131,16 +148,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </div>
         </div>
 
-        <div className="settings-group">
-          <label className="settings-label">Shortcuts</label>
-          <div className="clipboard-hint">
-            <span>⌨️</span>
-            <span>
-              ⌘⇧G Grammar · ⌘⇧R Rewrite · ⌘⇧J Jira · ⌘⇧S Standup · ⌘⇧B Bug · ⌘⇧T Test
-            </span>
-          </div>
-        </div>
       </div>
+
+      {appMeta && (
+        <div style={{ textAlign: "center", padding: "6px 0 2px" }}>
+          <span
+            onClick={handleVersionClick}
+            style={{ fontSize: "10px", color: "var(--text-muted)", cursor: "default", userSelect: "none" }}
+          >
+            {appMeta.name} v{appMeta.version}
+          </span>
+          {showAuthor && (
+            <div style={{ fontSize: "10px", color: "var(--accent-primary)", marginTop: "2px" }}>
+              By {appMeta.author}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="settings-footer">
         <button className="btn-secondary" onClick={onClose}>
