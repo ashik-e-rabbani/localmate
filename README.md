@@ -1,4 +1,5 @@
 # LocalMate
+
 <img width="64" height="64" alt="localmate" src="https://github.com/user-attachments/assets/4785f812-12b9-428a-950e-4570963be607" />
 
 LocalMate is a personal desktop application that talks directly with your locally installed LLMs. It empowers you with features like text rewriting, grammar fixes, and seamless Jira updates, all while keeping your data private and entirely on your local machine.
@@ -43,10 +44,12 @@ LocalMate requires environment variables to configure its connection to your loc
 
 To run with the **Release** builds:
 
-- Run ollama server @ http://localhost:11434
-- Install the localmate application
-- Specify the model in application **Settings** -> **Save**
-You will see a green dot indicating a successful connection with your local server.
+- Install the Ollama server if you haven't already: [Ollama](https://ollama.com/)
+- Run ollama server: `ollama serve`
+- Pull model(s) you want to use, for example: `ollama pull llama3.2`
+- Install the localmate app for macOS / windows (Upcoming)
+- Specify the model in application **Settings** -> **Save** (by default it is set to llama3.2)
+- You will see a green dot indicating a successful connection with your local server.
 
 ---
 
@@ -64,7 +67,7 @@ npm run tauri build
 
 _(The compiled binaries will be output into the `src-tauri/target/release` folder)_
 
-## 🔄 Workflow
+## 🔄 Workflow (Localbuild)
 
 1. **Start Local LLM**: Launch your local LLM instance (e.g., run `ollama serve` and ensure the `llama3.2` model is available). You can specify and use your own model too by changing the `VITE_DEFAULT_MODEL` and `VITE_OLLAMA_BASE_URL` environment variables. Check [Ollama](https://ollama.com/) for more information and download latest version of Ollama.
 2. **Launch App**: Open LocalMate via `npm run tauri dev`.

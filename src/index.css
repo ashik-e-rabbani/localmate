@@ -127,12 +127,15 @@ html, body, #root {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  transition: opacity var(--transition-smooth);
+  transition: opacity 200ms ease, transform 200ms ease;
+  transform: scale(1);
+  transform-origin: bottom right;
 }
 
 .app-shell.collapsed .shell-main-content {
   opacity: 0;
   pointer-events: none;
+  transform: scale(0.92);
 }
 
 /* Floating Handle (Visible when collapsed) */
@@ -140,8 +143,8 @@ html, body, #root {
   position: absolute;
   left: 0;
   top: 0;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
   border: 1px solid var(--border-subtle);
   border-radius: 50%;
@@ -166,8 +169,8 @@ html, body, #root {
 }
 
 .floating-handle-icon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
   object-fit: cover;
   pointer-events: none;

@@ -1,89 +1,15 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ResultPanel, ActionType } from "./components/ResultPanel";
 import { SettingsScreen } from "./components/SettingsScreen";
-import { generateText, checkOllamaHealth } from "./services/ollama";
+import { generateText } from "./services/ollama";
 import { readClipboard } from "./services/clipboard";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import { grammarPrompt } from "./prompts/grammar";
-import { rewritePrompt } from "./prompts/rewrite";
-import { jiraPrompt } from "./prompts/jira";
-import { standupPrompt } from "./prompts/standup";
-import { bugReportPrompt } from "./prompts/bugreport";
-import { testCasePrompt } from "./prompts/testcase";
-import { getCurrentWindow, LogicalSize, LogicalPosition } from "@tauri-apps/api/window";
+import { useOllamaHealth } from "./hooks/useOllamaHealth";
+import { useWindowCollapse } from "./hooks/useWindowCollapse";
+import { ACTIONS, buildPrompt, Screen } from "./constants/actions";
 import appIcon from "./assets/icon-32.png";
 import "./index.css";
-
-const EXPANDED_WIDTH = 300;
-const EXPANDED_HEIGHT = 500;
-const COLLAPSED_WIDTH = 32;
-const COLLAPSED_HEIGHT = 32;
-
-type Screen = "menu" | "result" | "settings";
-
-interface Action {
-  id: ActionType;
-  label: string;
-  icon: string;
-  iconClass: string;
-  shortcut: string;
-}
-
-const ACTIONS: Action[] = [
-  {
-    id: "grammar",
-    label: "Improve",
-    icon: "✍️",
-    iconClass: "icon-grammar",
-    shortcut: "⌘⇧G",
-  },
-  {
-    id: "rewrite",
-    label: "Rewrite",
-    icon: "🔄",
-    iconClass: "icon-rewrite",
-    shortcut: "⌘⇧R",
-  }
-  ,
-  {
-    id: "standup",
-    label: "Standup Notes",
-    icon: "📅",
-    iconClass: "icon-standup",
-    shortcut: "⌘⇧S",
-  },
-  {
-    id: "bugreport",
-    label: "Jira Ticket",
-    icon: "🐛",
-    iconClass: "icon-bug",
-    shortcut: "⌘⇧B",
-  },
-  {
-    id: "testcase",
-    label: "Test Case",
-    icon: "🧪",
-    iconClass: "icon-test",
-    shortcut: "⌘⇧T",
-  },
-];
-
-function buildPrompt(action: ActionType, text: string): string {
-  switch (action) {
-    case "grammar":
-      return grammarPrompt(text);
-    case "rewrite":
-      return rewritePrompt(text);
-    case "jira":
-      return jiraPrompt(text);
-    case "standup":
-      return standupPrompt(text);
-    case "bugreport":
-      return bugReportPrompt(text);
-    case "testcase":
-      return testCasePrompt(text);
-  }
-}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -92,113 +18,25 @@ export default function App() {
   const [streamingText, setStreamingText] = useState("");
   const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ollamaOnline, setOllamaOnline] = useState(false);
-  const abortRef = useRef<boolean>(false);
   const [userText, setUserText] = useState("");
+  const abortRef = useRef<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const [isPinned, setIsPinned] = useState(() => {
-    const saved = localStorage.getItem("LocalMate_pinned");
-    return saved ? JSON.parse(saved) : false;
-  });
-  const collapseTimeoutRef = useRef<any>(null);
-  const isResizingRef = useRef(false);
-  const windowPosRef = useRef<{ x: number; y: number } | null>(null);
-  const [resizeError, setResizeError] = useState<string | null>(null);
+  const ollamaOnline = useOllamaHealth();
 
-  // sync pin preference to localStorage
-  useEffect(() => {
-    localStorage.setItem("LocalMate_pinned", JSON.stringify(isPinned));
-  }, [isPinned]);
-
-  // Resize the actual Tauri window when collapse state changes
-  useEffect(() => {
-    const tauriWindow = getCurrentWindow();
-    const resizeWindow = async () => {
-      if (isResizingRef.current) return;
-      isResizingRef.current = true;
-      try {
-        const factor = await tauriWindow.scaleFactor();
-        if (isCollapsed) {
-          // Save current logical position before collapsing
-          const physicalPos = await tauriWindow.outerPosition();
-          // @ts-ignore
-          const pos = typeof physicalPos.toLogical === 'function' ? physicalPos.toLogical(factor) : { x: physicalPos.x / factor, y: physicalPos.y / factor };
-          windowPosRef.current = { x: pos.x, y: pos.y };
-          // Move window right so the collapsed handle stays at the right edge
-          const newX = pos.x + (EXPANDED_WIDTH - COLLAPSED_WIDTH);
-          // Force window to be resizable so macOS doesn't ignore the setSize command
-          await tauriWindow.setResizable(true);
-          await tauriWindow.setMinSize(new LogicalSize(32, 32));
-          
-          await tauriWindow.setSize(new LogicalSize(COLLAPSED_WIDTH, COLLAPSED_HEIGHT));
-          await tauriWindow.setPosition(new LogicalPosition(newX, pos.y + (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2));
-        } else {
-          // Restore expanded size
-          if (windowPosRef.current) {
-            await tauriWindow.setPosition(new LogicalPosition(windowPosRef.current.x, windowPosRef.current.y));
-          }
-          await tauriWindow.setResizable(true);
-          await tauriWindow.setSize(new LogicalSize(EXPANDED_WIDTH, EXPANDED_HEIGHT));
-        }
-        setResizeError(null);
-      } catch (err: any) {
-        setResizeError(err.toString());
-        console.error("Failed to resize window:", err);
-      } finally {
-        isResizingRef.current = false;
-      }
-    };
-    resizeWindow();
-  }, [isCollapsed, isPinned]);
-
-  const expandPanel = useCallback(() => {
-    if (collapseTimeoutRef.current) {
-      clearTimeout(collapseTimeoutRef.current);
-      collapseTimeoutRef.current = null;
-    }
-    setIsCollapsed(false);
-  }, []);
-
-  const handleShellMouseEnter = useCallback(() => {
-    if (collapseTimeoutRef.current) {
-      clearTimeout(collapseTimeoutRef.current);
-      collapseTimeoutRef.current = null;
-    }
-  }, []);
-
-  const startCollapseTimer = useCallback(() => {
-    if (isPinned) return;
-    if (screen === "result" && !isDone) return;
-
-    // Prevent collapse if an input/textarea is currently focused
-    const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
-      return;
-    }
-
-    if (collapseTimeoutRef.current) {
-      clearTimeout(collapseTimeoutRef.current);
-    }
-    collapseTimeoutRef.current = setTimeout(() => {
-      setIsCollapsed(true);
-    }, 800);
-  }, [isPinned, screen, isDone]);
-
-  // Health check on mount and every 10s
-  useEffect(() => {
-    const check = async () => {
-      const ok = await checkOllamaHealth();
-      setOllamaOnline(ok);
-    };
-    check();
-    const interval = setInterval(check, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  const {
+    isCollapsed,
+    setIsCollapsed,
+    isPinned,
+    setIsPinned,
+    resizeError,
+    handleMouseDownPos,
+    expandPanel,
+    handleShellMouseEnter,
+    startCollapseTimer,
+  } = useWindowCollapse(screen, isDone);
 
   const runAction = useCallback(async (action: ActionType, text?: string) => {
-    // Priority: explicit text arg > userText from textarea > clipboard
     const resolvedText = text ?? (userText.trim() ? userText : await readClipboard());
     if (!resolvedText.trim()) {
       setActiveAction(action);
@@ -218,36 +56,19 @@ export default function App() {
     setError(null);
     setIsDone(false);
     setScreen("result");
-    setIsCollapsed(false); // Expand to show streaming progress
+    setIsCollapsed(false);
 
     const prompt = buildPrompt(action, resolvedText);
 
     await generateText(
       prompt,
-      (chunk) => {
-        if (abortRef.current) return;
-        setStreamingText((prev) => prev + chunk);
-      },
-      (_full) => {
-        if (!abortRef.current) setIsDone(true);
-      },
-      (err) => {
-        if (!abortRef.current) {
-          setError(err);
-          setIsDone(true);
-        }
-      }
+      (chunk) => { if (!abortRef.current) setStreamingText((prev) => prev + chunk); },
+      (_full) => { if (!abortRef.current) setIsDone(true); },
+      (err)   => { if (!abortRef.current) { setError(err); setIsDone(true); } }
     );
   }, [userText]);
 
-  const handleShortcut = useCallback(
-    (action: ActionType) => {
-      runAction(action);
-    },
-    [runAction]
-  );
-
-  useGlobalShortcuts(handleShortcut);
+  useGlobalShortcuts(useCallback((action: ActionType) => runAction(action), [runAction]));
 
   const handleBack = () => {
     abortRef.current = true;
@@ -259,9 +80,7 @@ export default function App() {
   };
 
   const handleRetry = () => {
-    if (activeAction && inputText) {
-      runAction(activeAction, inputText);
-    }
+    if (activeAction && inputText) runAction(activeAction, inputText);
   };
 
   return (
@@ -270,56 +89,57 @@ export default function App() {
       onMouseEnter={handleShellMouseEnter}
       onMouseLeave={startCollapseTimer}
     >
-      {/* Floating Handle — visible only when collapsed */}
+      {/* Floating handle — visible only when collapsed */}
       <div
         className="floating-handle"
-        onClick={expandPanel}
+        onMouseDown={(e) => { handleMouseDownPos.current = { x: e.screenX, y: e.screenY }; }}
+        onClick={(e) => {
+          const down = handleMouseDownPos.current;
+          if (down && (Math.abs(e.screenX - down.x) > 4 || Math.abs(e.screenY - down.y) > 4)) return;
+          expandPanel();
+        }}
         data-tauri-drag-region
       >
         <img src={appIcon} alt="LocalMate" className="floating-handle-icon" />
-        {resizeError && <div style={{position:'absolute', top: '100%', left: 0, background:'red', color:'white', fontSize:'10px', width: '200px', zIndex: 9999}}>{resizeError}</div>}
+        {resizeError && (
+          <div style={{ position: "absolute", top: "100%", left: 0, background: "red", color: "white", fontSize: "10px", width: "200px", zIndex: 9999 }}>
+            {resizeError}
+          </div>
+        )}
       </div>
 
       <div className="shell-main-content">
-        {/* Header — always visible as base layer */}
+        {/* Header */}
         <div className="app-header" data-tauri-drag-region>
-          <div className="header-icon"><img src={appIcon} alt="LocalMate" className="header-icon-img" /></div>
+          <div className="header-icon">
+            <img src={appIcon} alt="LocalMate" className="header-icon-img" />
+          </div>
           <div className="header-info">
             <div className="header-title">LocalMate</div>
             <div className="header-subtitle">Your LLM Assistant</div>
           </div>
-
           <button
             className={`header-pin-btn ${isPinned ? "pinned" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsPinned(!isPinned);
-            }}
+            onClick={(e) => { e.stopPropagation(); setIsPinned(!isPinned); }}
             title={isPinned ? "Unpin panel (enable auto-hide)" : "Pin panel (disable auto-hide)"}
           >
             📌
           </button>
-
           <button
             className="header-minimize-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsCollapsed(true);
-            }}
+            onClick={(e) => { e.stopPropagation(); setIsCollapsed(true); }}
             title="Minimize to handle"
           >
             ⎯
           </button>
-
           <div
             className={`header-status ${ollamaOnline ? "" : "offline"}`}
             title={ollamaOnline ? "Ollama connected" : "Ollama offline"}
           />
         </div>
 
-        {/* Main menu content */}
+        {/* Menu */}
         <div className="app-content">
-          {/* Text Input Area */}
           <div className="text-input-container">
             <textarea
               ref={textareaRef}
@@ -332,10 +152,7 @@ export default function App() {
             {userText && (
               <button
                 className="text-input-clear"
-                onClick={() => {
-                  setUserText("");
-                  textareaRef.current?.focus();
-                }}
+                onClick={() => { setUserText(""); textareaRef.current?.focus(); }}
                 title="Clear text"
               >
                 ✕
@@ -359,9 +176,7 @@ export default function App() {
               disabled={!ollamaOnline}
               title={`${action.label} (${action.shortcut})`}
             >
-              <div className={`action-icon ${action.iconClass}`}>
-                {action.icon}
-              </div>
+              <div className={`action-icon ${action.iconClass}`}>{action.icon}</div>
               <span className="action-label">{action.label}</span>
               <span className="action-shortcut">{action.shortcut}</span>
             </button>
@@ -375,9 +190,7 @@ export default function App() {
             onClick={() => setScreen("settings")}
             style={{ marginTop: "auto" }}
           >
-            <div className="action-icon" style={{ background: "rgba(255,255,255,0.05)" }}>
-              ⚙️
-            </div>
+            <div className="action-icon" style={{ background: "rgba(255,255,255,0.05)" }}>⚙️</div>
             <span className="action-label">Settings</span>
           </button>
 
@@ -386,15 +199,12 @@ export default function App() {
             className="action-btn quit-btn"
             onClick={() => getCurrentWindow().destroy()}
           >
-            <div className="action-icon icon-quit">
-              ⏻
-            </div>
+            <div className="action-icon icon-quit">⏻</div>
             <span className="action-label">Quit App</span>
           </button>
         </div>
       </div>
 
-      {/* Result overlay — outside shell-main-content to avoid pointer-events: none when collapsed */}
       {screen === "result" && activeAction && (
         <ResultPanel
           action={activeAction}
@@ -407,7 +217,6 @@ export default function App() {
         />
       )}
 
-      {/* Settings overlay — outside shell-main-content */}
       {screen === "settings" && (
         <SettingsScreen onClose={() => setScreen("menu")} />
       )}
